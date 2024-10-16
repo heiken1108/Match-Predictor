@@ -4,7 +4,7 @@ import pandas as pd
 def test_method():
   print("Hello World")
 
-def fetch_data_into_file(data_folder, file_name, start_year, end_year, leagues):
+def fetch_data_into_file(data_folder, file_name, start_year, end_year, leagues) -> None:
   url_template = "https://www.football-data.co.uk/mmz4281/{season}/{league}.csv"
   cols = ["Div", "Date", "HomeTeam", "AwayTeam", "FTHG", "FTAG", "FTR", "HTHG", "HTAG", "HTR", "Referee", "HS", "AS", "HST", "AST", "HF", "AF", "HC", "AC", "HY", "AY", "HR", "AR", "PSH", "PSD", "PSA", "HBP"]
 
@@ -30,3 +30,8 @@ def fetch_data_into_file(data_folder, file_name, start_year, end_year, leagues):
   file_path = os.path.join(data_folder, file_name + ".csv")
   df.to_csv(file_path, index=False)
   print("Data fetched and saved to", file_path)
+
+def load_data(data_folder, file_name) -> pd.DataFrame:
+  file_path = os.path.join(data_folder, file_name + '.csv')
+  df = pd.read_csv(file_path)
+  return df
