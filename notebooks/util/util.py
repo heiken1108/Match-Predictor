@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+from matplotlib import pyplot as plt
 
 def test_method():
   print("Hello World")
@@ -90,3 +91,18 @@ def transform_dataframe_to_base_format(df) -> pd.DataFrame:
   new_df = pd.DataFrame(new_rows)
   
   return new_df
+
+def get_team_matches(df, teamname) -> pd.DataFrame: 
+  return df[(df['Team'] == teamname)]
+
+def get_all_teams(df) -> list:
+  return df['Team'].unique().tolist()
+
+def plot_data(df, x, y, figsize):
+  plt.figure(figsize=figsize)  
+  plt.plot(df[x], df[y], marker='o', linestyle='-', color='b')
+  plt.xlabel(x)  
+  plt.ylabel(y)  
+  plt.title(f'{y} vs {x}')  
+  plt.grid(False)  
+  plt.show()  
