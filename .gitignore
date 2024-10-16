@@ -1,0 +1,4 @@
+Data/*
+
+# Unntak: Ikke ignorer selve Data-mappen
+!Data/
