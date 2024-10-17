@@ -137,7 +137,6 @@ def plot_series(data, x_values=None, labels=None,
       x = x_values
     else:
       x = data.index
-    print(x)
     # Plot data
     plt.plot(x, data.values, zorder=0)
     # Rotated x ticks
@@ -193,6 +192,7 @@ class EloRating():
     try:
       new_rating_team, new_rating_opponent = self.calculate_new_rating(self.ratings[team], self.ratings[opponent], result)
       self.ratings[team] = new_rating_team
+      return new_rating_team
     except KeyError:
       print("One or both teams does not exist")
       return None
@@ -227,9 +227,12 @@ class EloRating():
     real_expected_loss = expected_loss_without_draws - real_expected_draw/2
     return real_expected_win, real_expected_draw, real_expected_loss
   
-  def perform_simulations(self, matches) -> None:
+  def perform_simulations(self, matches) -> pd.DataFrame:
+    matches['ELO'] = None
     for index, row in matches.iterrows():
-      self.perform_matchup(row['Team'], row['Opponent'], row['Result'])
+      new_rating = self.perform_matchup(row['Team'], row['Opponent'], row['Result'])
+      matches.at[index, 'ELO'] = new_rating
+    return matches
 
 class ShortTermForm():
   def __init__(self):
