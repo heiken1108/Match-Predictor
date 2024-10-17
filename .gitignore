@@ -2,3 +2,5 @@ data/*
 
 # Unntak: Ikke ignorer selve Data-mappen
 !data/
+
+.prettierrc
