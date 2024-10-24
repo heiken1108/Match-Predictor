@@ -30,3 +30,13 @@ Project work for the subject Atrifical Intelligence in Industry
 -   PSH = Pinnacle home win odds
 -   PSD = Pinnacle draw odds
 -   PSA = Pinnacle away win odds
+
+## How to run
+
+```
+python -m venv venv
+
+source venv/bin/activate
+
+pip install -r requirements.txt
+```
