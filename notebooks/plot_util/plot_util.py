@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+import numpy as np
 
 anomaly_color = 'sandybrown'
 prediction_color = 'yellowgreen'
@@ -65,3 +66,8 @@ def plot_series(data, x_values=None, labels=None,
 		plt.ylabel(ylabel)
 		plt.grid(':')
 		plt.tight_layout() 
+
+
+def plot_histogram(y_values, figsize=figsize):
+	bins = np.arange(y_values.min() - 0.5, y_values.max() + 1.5, 1)
+	y_values.hist(bins=bins, figsize=figsize, edgecolor='black', rwidth=0.9)
