@@ -4,3 +4,11 @@ data/*
 !data/
 
 .prettierrc
+
+venv/
+
+.vscode/
+
+**/__pycache__/
+
+notebooks/.ipynb_checkpoints/
