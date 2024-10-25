@@ -71,7 +71,7 @@ def plot_series(data, labels=None,
 
 def load_data(data_folder, file_name) -> pd.DataFrame:
 	file_path = os.path.join(data_folder, file_name + '.csv')
-	df = pd.read_csv(file_path)
+	df = pd.read_csv(file_path, parse_dates=['Date'], dtype={'Season': str})
 	return df
 
 def fetch_data_into_file(data_folder, file_name, start_year, end_year, leagues) -> None:
@@ -84,6 +84,7 @@ def fetch_data_into_file(data_folder, file_name, start_year, end_year, leagues) 
 		start = str(year)[-2:]
 		end = str(year + 1)[-2:]
 		seasons.append(start + end)
+
 
 	df_tmp = []
 	for season in seasons:
@@ -108,6 +109,7 @@ def fetch_data_into_file(data_folder, file_name, start_year, end_year, leagues) 
 			
 			existing_cols = [col for col in cols if col in df.columns]
 			df = df[existing_cols]
+			df["Season"] = str(season).zfill(4)
 			df_tmp.append(df)
 	df = pd.concat(df_tmp)
 
@@ -136,6 +138,35 @@ def extract_elo_history(data, team) -> pd.DataFrame:
 			})
 	return pd.DataFrame(elo_history)
 
+def add_discrete_league_columns(data: pd.DataFrame) -> pd.DataFrame:
+	leagues = data['Div'].unique()
+	for league in leagues:
+		data[league] = False
+
+	for league in leagues:
+		data.loc[data['Div'] == league, league] = True
+
+	return data
+
+def add_discrete_result_columns(data: pd.DataFrame) -> pd.DataFrame:
+	results = data['FTR'].unique()
+	for result in results:
+		data[result] = False
+
+	for result in results:
+		data.loc[data['FTR'] == result, result] = True
+	
+	return data
+
+def add_discrete_season_columns(data: pd.DataFrame) -> pd.DataFrame:
+	seasons = data['Season'].unique()
+	for season in seasons:
+		data[season] = False
+
+	for season in seasons:
+		data.loc[data['Season'] == season, season] = True
+	
+	return data
 
 class ELO():
 	def __init__(self, data, init_rating = 1500, draw_factor=0.25, k_factor=32, home_advantage=0):
