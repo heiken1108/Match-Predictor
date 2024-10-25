@@ -10,9 +10,79 @@ validation_color = 'gold'
 test_color = 'coral'
 figsize=(9, 3)
 
-def plot_histogram(y_values, figsize=figsize):
-	bins = np.arange(y_values.min() - 0.5, y_values.max() + 1.5, 1)
-	y_values.hist(bins=bins, figsize=figsize, edgecolor='black', rwidth=0.9)
+def plot_histogram(data: pd.DataFrame, figsize=figsize):
+	bins = np.arange(data.values.min() - 0.5, data.values.max() + 1.5, 1)
+	data.values.hist(bins=bins, figsize=figsize, edgecolor='black', rwidth=0.9)
+
+def plot_discrete_histogram(data: pd.DataFrame, vmin=None, vmax=None, figsize=figsize):
+	plt.close('all')
+	plt.figure(figsize=figsize)
+	bins = np.arange(data.values.min() - 0.5, data.values.max() + 1.5, 1)
+	plt.hist(data.values, bins=bins, edgecolor='black', rwidth=0.9)
+	lims = plt.xlim()
+	if vmin is not None:
+		lims = (vmin, lims[1])
+	if vmax is not None:
+		lims = (lims[0], vmax)
+	plt.xlim(lims)
+	plt.grid()
+	plt.tight_layout()
+
+def plot_histogram(data, bins=10, vmin=None, vmax=None, figsize=figsize):
+    # Build a new figure
+    plt.close('all')
+    plt.figure(figsize=figsize)
+    # Plot a histogram
+    plt.hist(data, density=True, bins=bins)
+    # Update limits
+    lims = plt.xlim()
+    if vmin is not None:
+        lims = (vmin, lims[1])
+    if vmax is not None:
+        lims = (lims[0], vmax)
+    plt.xlim(lims)
+    plt.grid()
+    plt.tight_layout()
+
+def plot_histogram2d(xdata, ydata, bins=10, figsize=figsize):
+    # Build a new figure
+    plt.close('all')
+    plt.figure(figsize=figsize)
+    # Plot a histogram
+    plt.hist2d(xdata, ydata, density=True, bins=bins)
+    plt.tight_layout()
+
+def plot_discrete_histogram2d(x_data, y_data, x_label='X axis', y_label='Y axis', vmin=None, vmax=None, figsize=figsize):
+    plt.close('all')
+    plt.figure(figsize=figsize)
+
+    # Define bin edges for both x and y with a width and height of 1 unit
+    x_bins = np.arange(np.min(x_data) - 0.5, np.max(x_data) + 1, 1)
+    y_bins = np.arange(np.min(y_data) - 0.5, np.max(y_data) + 1, 1)
+    
+    # Calculate 2D histogram with specified bins
+    counts, xedges, yedges = np.histogram2d(x_data, y_data, bins=[x_bins, y_bins])
+
+    # Define a colormap and plot with plt.pcolormesh for discrete box-dots appearance
+    plt.pcolormesh(
+        xedges - 0.05, yedges - 0.05, counts.T, 
+        cmap='Blues', vmin=vmin, vmax=vmax, edgecolor='black', linewidth=0.3
+    )
+    
+    # Add color bar for reference
+    plt.colorbar(label='Counts')
+
+    # Set axis limits
+    plt.xlim(xedges[0], xedges[-1] - 0.1)
+    plt.ylim(yedges[0], yedges[-1] - 0.1)
+    
+    # Set axis labels and grid
+    plt.xlabel(x_label)
+    plt.ylabel(y_label)
+    plt.grid(True, color='gray', linestyle='--', linewidth=0.5)
+    plt.tight_layout()
+    plt.show()
+
 
 def plot_series(data, labels=None,
 										windows=None,
