@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pandas as pd
+import seaborn as sns
 
 anomaly_color = 'sandybrown'
 prediction_color = 'yellowgreen'
@@ -82,6 +83,15 @@ def plot_discrete_histogram2d(x_data, y_data, x_label='X axis', y_label='Y axis'
     plt.grid(True, color='gray', linestyle='--', linewidth=0.5)
     plt.tight_layout()
     plt.show()
+
+def plot_correlation_matrix(data: pd.DataFrame, figsize=(10, 8), cmap='Blues', annot=False):
+    plt.close('all')
+    matrix = data.corr(method='pearson')
+    plt.figure(figsize=figsize)
+    sns.heatmap(matrix, cmap=cmap, annot=annot, linewidth=0.5)  # Added linewidth parameter
+    plt.tight_layout()
+    plt.show()
+	
 
 
 def plot_series(data, labels=None,
