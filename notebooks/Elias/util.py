@@ -89,3 +89,45 @@ def calculate_team_stats(data, n=5):
 
     print(f"Skipped {skipped_matches} matches due to insufficient previous matches.")
     return data
+
+
+def calculate_outcome_percentages(data):
+    """
+    Calculate the percentage of matches that resulted in a home win, draw, or away win
+    for each unique Matchrating value, with columns ordered as Win %, Draw %, and Loss %.
+
+    Parameters:
+        data (pd.DataFrame): DataFrame containing the match data with 'Matchrating',
+                             'FTHG' (full-time home goals), and 'FTAG' (full-time away goals) columns.
+
+    Returns:
+        pd.DataFrame: DataFrame with Matchrating values as index and columns for
+                      'Win %', 'Draw %', and 'Loss %', representing the percentage of each outcome.
+    """
+
+    # Step 1: Add a column for the match outcome (1 for Win, 0 for Draw, -1 for Loss)
+    data = data.copy()  # Ensure we do not modify the original DataFrame
+    data["Outcome"] = data.apply(
+        lambda row: (
+            1 if row["FTHG"] > row["FTAG"] else (-1 if row["FTHG"] < row["FTAG"] else 0)
+        ),
+        axis=1,
+    )
+
+    # Step 2: Calculate outcome percentages by Matchrating
+    outcome_percentages = (
+        data.groupby("Matchrating")["Outcome"]
+        .value_counts(
+            normalize=True
+        )  # Get the proportion of each outcome per Matchrating
+        .unstack(fill_value=0)  # Spread outcomes across columns and replace NaNs with 0
+        * 100  # Convert proportions to percentages
+    )
+
+    # Step 3: Rename columns and reorder for clarity
+    outcome_percentages = outcome_percentages.rename(
+        columns={1: "Home Wins %", 0: "Draw %", -1: "Home Loss %"}
+    )
+    outcome_percentages = outcome_percentages[["Home Wins %", "Draw %", "Home Loss %"]]
+
+    return outcome_percentages
