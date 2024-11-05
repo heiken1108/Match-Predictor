@@ -156,7 +156,7 @@ def load_data(data_folder, file_name) -> pd.DataFrame:
 
 def fetch_data_into_file(data_folder, file_name, start_year, end_year, leagues) -> None:
 	url_template = "https://www.football-data.co.uk/mmz4281/{season}/{league}.csv"
-	cols = ["Div", "Date", "HomeTeam", "AwayTeam", "FTHG", "FTAG", "FTR", "HTHG", "HTAG", "HTR", "Referee", "HS", "AS", "HST", "AST", "HF", "AF", "HC", "AC", "HY", "AY", "HR", "AR", "PSH", "PSD", "PSA", "HBP"]
+	cols = ["Div", "Date", "HomeTeam", "AwayTeam", "FTHG", "FTAG", "FTR", "HTHG", "HTAG", "HTR", "Referee", "HS", "AS", "HST", "AST", "HF", "AF", "HC", "AC", "HY", "AY", "HR", "AR", "HBP"]
 
 	#Generate seasons list
 	seasons = []
@@ -248,8 +248,8 @@ def add_discrete_season_columns(data: pd.DataFrame) -> pd.DataFrame:
 	
 	return data
 
-class ELO():
-	def __init__(self, data, init_rating = 1500, draw_factor=0.25, k_factor=32, home_advantage=0):
+class ELO(): #Kan gjøre slik at home_advantage lages slik at den helles gir home_factor for kamper der hjemme og borte har samme rating
+	def __init__(self, data, init_rating = 1500, draw_factor=0.25, k_factor=32, home_advantage=100):
 		self.data = data
 		self.init_rating = init_rating
 		self.draw_factor = draw_factor
@@ -327,8 +327,121 @@ class ELO():
 		data['Draw_prob_ELO'] = None
 		data['Away_prob_ELO'] = None
 		for index, row in data.iterrows():
-			home_prob, draw_prob, away_prob = self.expect_result(row['Home ELO'], row['Away ELO'])
+			home_prob, draw_prob, away_prob = self.expect_result(row['Home ELO'] + self.home_advantage, row['Away ELO'])
 			data.at[index, 'Home_prob_ELO'] = home_prob
 			data.at[index, 'Draw_prob_ELO'] = draw_prob
 			data.at[index, 'Away_prob_ELO'] = away_prob
 		return data
+	
+
+def get_metrics(data: pd.DataFrame, threshold: float):
+	tp = []
+	fp = []
+	tn = []
+	fn = []
+	for index, row in data.iterrows():
+		if row['Home_prob_ELO'] >= threshold and row['H']:
+			tp.append(row)
+		elif row['Home_prob_ELO'] >= threshold and not row['H']:
+			fp.append(row)
+		elif row['Home_prob_ELO'] < threshold and not row['H']:
+			tn.append(row)
+		elif row['Home_prob_ELO'] < threshold and row['H']:
+			fn.append(row)
+	return pd.Series(tp), pd.Series(fp), pd.Series(tn), pd.Series(fn)
+class SimpleCostModel():
+	def __init__(self, wrong, missed):
+		self.wrong = wrong
+		self.missed = missed
+
+	def cost(self, data, threshold):
+		tp, fp, tn, fn = get_metrics(data, threshold)
+		return len(fp)*self.wrong + len(fn)*self.missed
+
+def opt_thr(data, cmodel, thr_range):
+	costs = [cmodel.cost(data, thr)for thr in thr_range]
+	costs = np.array(costs)
+	best_idx = np.argmin(costs)
+	return thr_range[best_idx], costs[best_idx]
+
+
+def get_all_matches_of_team(data, team):
+	c = data.copy()
+	return c[(c['HomeTeam'] == team) | (c['AwayTeam'] == team)]
+
+
+def add_sequential_column(data: pd.DataFrame, home_column, away_column, n=5, operation='Sum', regard_opponent=False, include_current=False):
+	"""
+		Function that performs the operation on the n last matches for each team.
+		If regard_opponent is True, the operation is performed on the opponents column instead.
+		Example: Home_column = FTHG, Away_column=FTAG, Operation = Sum, n = 5, regard_opponent = False creates columns to describe how many goals the team has scored in the last 5 matches.
+		Example: Home_column = FTHG, Away_column=FTAG, Operation = Sum, n = 5, regard_opponent = True creates columns to describe how many of goals the team has conceded in the last 5 matches.
+		Args:
+			data (pd.DataFrame): The dataframe to add the columns to.
+			home_column (str): The column to use if the team is at home.
+			away_column (str): The column to use if the team is away.
+			n (int): The number of matches to consider.
+			operation (str): The operation to perform. Can be 'Sum', 'Mean' or 'Change'.
+			regard_opponent (bool): If True, the operation is performed on the opponents column instead. E.g. Can be used to get mean of opponent ELO 
+			include_current (bool): If True, the current match is included in the operation. Used if column is already dependent on previous matches, such as Home ELO and Away ELO.
+	"""
+	new_column_name_home = home_column + '_' + operation + '_' + str(n) + ('_opponent' if regard_opponent else '')
+	new_column_name_away = away_column + '_' + operation + '_' + str(n) + ('_opponent' if regard_opponent else '')
+	data[new_column_name_home] = None
+	data[new_column_name_away] = None
+	teams = data['HomeTeam'].unique()
+	for team in teams:
+		matches = get_all_matches_of_team(data, team)
+		scores = {}
+		pos = 0 if not include_current else 1
+		for index, row in matches.iterrows():
+			start_pos = max(0, pos-n)
+			relevant_matches = matches.iloc[start_pos:pos]
+			s = 0
+			if operation == 'Sum':
+				for index_r,row_r in relevant_matches.iterrows():
+					if row_r['HomeTeam'] == team:
+						if regard_opponent:
+							s += row_r[away_column]
+						else:
+							s += row_r[home_column]
+					else:
+						if regard_opponent:
+							s += row_r[home_column]
+						else:
+							s += row_r[away_column]
+			elif operation == 'Mean':
+				for index_r, row_r in relevant_matches.iterrows():
+					if row_r['HomeTeam'] == team:
+						if regard_opponent:
+							s += row_r[away_column]
+						else:
+							s += row_r[home_column]
+					else:
+						if regard_opponent:
+							s += row_r[home_column]
+						else:
+							s += row_r[away_column]
+				if len(relevant_matches) == 0:
+					s = 0
+				else:
+					s = s / len(relevant_matches)
+			elif operation == 'Change':
+				if len(relevant_matches) == 0:
+					s = 0
+				else:
+					first_row = relevant_matches.iloc[0]
+					last_row = relevant_matches.iloc[-1]
+					first_score = first_row[home_column] if first_row['HomeTeam'] == team else first_row[away_column]
+					last_score = last_row[home_column] if last_row['HomeTeam'] == team else last_row[away_column]
+					s = last_score - first_score
+			scores[index] = s
+			pos += 1
+				
+		
+		for key, value in scores.items():
+			if data.at[key, 'HomeTeam'] == team:
+				data.at[key, new_column_name_home] = value
+			else:
+				data.at[key, new_column_name_away] = value
+	return data
