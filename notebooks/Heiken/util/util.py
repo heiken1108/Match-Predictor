@@ -435,6 +435,22 @@ def add_sequential_column(data: pd.DataFrame, home_column, away_column, n=5, ope
 					first_score = first_row[home_column] if first_row['HomeTeam'] == team else first_row[away_column]
 					last_score = last_row[home_column] if last_row['HomeTeam'] == team else last_row[away_column]
 					s = last_score - first_score
+			elif operation == 'Points':
+				for index_r, row_r in relevant_matches.iterrows():
+					if row_r['HomeTeam'] == team:
+						if row_r['FTR'] == 'H':
+							s += 3
+						elif row_r['FTR'] == 'D':
+							s += 1
+						else:
+							s += 0
+					else:
+						if row_r['FTR'] == 'A':
+							s += 3
+						elif row_r['FTR'] == 'D':
+							s += 1
+						else:
+							s += 0
 			scores[index] = s
 			pos += 1
 				
