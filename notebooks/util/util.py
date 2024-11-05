@@ -636,7 +636,9 @@ def calculate_outcome_percentages(data):
 
     return outcome_stats
 
-def get_cleaned_data(data):
-    data = data.dropna(subset=["HomeTeam", "AwayTeam", "FTHG", "FTAG"])
-    data = data.reset_index(drop=True)
-    return data
+def get_cleaned_data(data: pd.DataFrame):
+	data = data.dropna(subset=["HomeTeam", "AwayTeam", "FTHG", "FTAG"])
+	data.drop(columns='Referee', inplace=True) #Fjerner kolonnen Referee
+	data.dropna(inplace=True) #Fjerner rader med manglende verdier
+	data = data.reset_index(drop=True)
+	return data
