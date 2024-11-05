@@ -28,9 +28,6 @@ def fetch_data_into_file(data_folder, file_name, start_year, end_year, leagues) 
         "AY",
         "HR",
         "AR",
-        "PSH",
-        "PSD",
-        "PSA",
         "HBP",
     ]
 
@@ -67,6 +64,7 @@ def fetch_data_into_file(data_folder, file_name, start_year, end_year, leagues) 
 
             existing_cols = [col for col in cols if col in df.columns]
             df = df[existing_cols]
+            df["Season"] = str(season).zfill(4)
             df_tmp.append(df)
     df = pd.concat(df_tmp)
 
@@ -112,20 +110,7 @@ def get_elo_ratings_for_team(data, team_name) -> pd.DataFrame:
 def split_matches_into_seasons(
     data, matches_per_season=380, start_year=2005, end_year=2024
 ):
-    """
-    Split the data into seasons, assuming each season has 380 matches, and return a combined DataFrame
-    with an additional 'Season' column for each row.
 
-    Parameters:
-    - data: pandas DataFrame containing all matches
-    - matches_per_season: number of matches per season (default is 380)
-    - start_year: the first year of the first season (default is 2005 for the 2005/06 season)
-    - end_year: the last year of the last season (default is 2024 for the 2023/24 season)
-
-    Returns:
-    - A combined pandas DataFrame with an additional 'Season' column labeling each match by season.
-    """
-    # List of season labels (from 2005/06 to 2023/24)
     seasons = [f"{year}/{year+1}" for year in range(start_year, end_year)]
 
     # Initialize an empty list to store the DataFrames
@@ -149,3 +134,9 @@ def split_matches_into_seasons(
     combined_data = pd.concat(season_dfs, ignore_index=True)
 
     return combined_data
+
+
+def get_cleaned_data(data):
+    data = data.dropna(subset=["HomeTeam", "AwayTeam", "FTHG", "FTAG"])
+    data = data.reset_index(drop=True)
+    return data

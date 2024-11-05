@@ -18,7 +18,10 @@ def get_last_n_matches(team, match_index, data, n=5):
 matches_not_calc = 0
 
 
-def calculate_team_stats(data, n=5):
+def calculate_team_stats(data, n=6):
+
+    data = data.copy()
+
     data.loc[:, "Home Goals Last 5"] = None
     data.loc[:, "Away Goals Last 5"] = None
     data.loc[:, "Home Conceded Last 5"] = None
@@ -91,22 +94,42 @@ def calculate_team_stats(data, n=5):
     return data
 
 
+def generate_matchrating_for_each_season_and_league(data):
+    """
+    Generate Matchrating for each season and league.
+    """
+    # Ensure the new columns are added to the main DataFrame
+    data = data.copy()
+    data["Home Goals Last 5"] = None
+    data["Away Goals Last 5"] = None
+    data["Home Conceded Last 5"] = None
+    data["Away Conceded Last 5"] = None
+    data["Home Goal Difference Last 5"] = None
+    data["Away Goal Difference Last 5"] = None
+    data["Matchrating"] = None
+
+    # Iterate over each season and league
+    for season in data["Season"].unique():
+        for league in data["Div"].unique():
+            # Filter data for the current season and league
+            season_league_data = data[
+                (data["Season"] == season) & (data["Div"] == league)
+            ]
+
+            # Calculate team stats for the season and league subset
+            season_league_data = calculate_team_stats(season_league_data)
+
+            # Update the main DataFrame with the calculated values
+            data.update(season_league_data)
+
+    return data
+
+
 def calculate_outcome_percentages(data):
-    """
-    Calculate the percentage of matches that resulted in a home win, draw, or away win
-    for each unique Matchrating value, with columns ordered as Win %, Draw %, and Loss %.
+    # Ensure we do not modify the original DataFrame
+    data = data.copy()
 
-    Parameters:
-        data (pd.DataFrame): DataFrame containing the match data with 'Matchrating',
-                             'FTHG' (full-time home goals), and 'FTAG' (full-time away goals) columns.
-
-    Returns:
-        pd.DataFrame: DataFrame with Matchrating values as index and columns for
-                      'Win %', 'Draw %', and 'Loss %', representing the percentage of each outcome.
-    """
-
-    # Step 1: Add a column for the match outcome (1 for Win, 0 for Draw, -1 for Loss)
-    data = data.copy()  # Ensure we do not modify the original DataFrame
+    # Step 1: Add a column for the match outcome (1 for Home Win, 0 for Draw, -1 for Away Win)
     data["Outcome"] = data.apply(
         lambda row: (
             1 if row["FTHG"] > row["FTAG"] else (-1 if row["FTHG"] < row["FTAG"] else 0)
@@ -124,10 +147,29 @@ def calculate_outcome_percentages(data):
         * 100  # Convert proportions to percentages
     )
 
-    # Step 3: Rename columns and reorder for clarity
+    # Step 3: Rename columns for clarity
     outcome_percentages = outcome_percentages.rename(
-        columns={1: "Home Wins %", 0: "Draw %", -1: "Home Loss %"}
+        columns={1: "Home Wins %", 0: "Draw %", -1: "Away Wins %"}
     )
-    outcome_percentages = outcome_percentages[["Home Wins %", "Draw %", "Home Loss %"]]
+    outcome_percentages = outcome_percentages[["Home Wins %", "Draw %", "Away Wins %"]]
 
-    return outcome_percentages
+    # Step 4: Calculate counts for each outcome by Matchrating
+    outcome_counts = (
+        data.groupby("Matchrating")["Outcome"]
+        .value_counts()  # Get the count of each outcome per Matchrating
+        .unstack(fill_value=0)  # Spread outcomes across columns and replace NaNs with 0
+    )
+
+    # Step 5: Rename columns for clarity in counts
+    outcome_counts = outcome_counts.rename(
+        columns={
+            1: "Number of Home Wins",
+            0: "Number of Draws",
+            -1: "Number of Away Wins",
+        }
+    )
+
+    # Step 6: Combine percentages and counts into a single DataFrame
+    outcome_stats = outcome_percentages.join(outcome_counts)
+
+    return outcome_stats
