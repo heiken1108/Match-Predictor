@@ -461,3 +461,39 @@ def add_sequential_column(data: pd.DataFrame, home_column, away_column, n=5, ope
 			else:
 				data.at[key, new_column_name_away] = value
 	return data
+
+
+def perform_picks(data, minimum_buffer_confidence): #Minimum confidence to next pick
+	correct = []
+	wrong = []
+	chicken = []
+	for index, row in data.iterrows():
+		home_prob = row['Home Prob']
+		draw_prob = row['Draw Prob']
+		away_prob = row['Away Prob']
+
+		max_prob = max(home_prob, draw_prob, away_prob)
+		next_best = max([prob for prob in [home_prob, draw_prob, away_prob] if prob != max_prob])
+
+		buffer = max_prob - next_best
+		if buffer < minimum_buffer_confidence:
+			chicken.append(row)
+		else:
+			if (max_prob == home_prob and row['H']) or (max_prob == draw_prob and row['D']) or (max_prob == away_prob and row['A']):
+				correct.append(row)
+			else:
+				wrong.append(row)
+	return pd.Series(correct), pd.Series(wrong), pd.Series(chicken)
+
+class CostModel():
+	def __init__(self, wrong, chicken):
+		self.wrong = wrong
+		self.chicken = chicken
+
+	def cost(self, data, minimum_buffer_confidence):
+		correct, wrong, chicken = perform_picks(data, minimum_buffer_confidence)
+		return len(wrong)*self.wrong + len(chicken)*self.chicken
+
+	def stats(self, data, minimum_buffer_confidence):
+		correct, wrong, chicken = perform_picks(data, minimum_buffer_confidence)
+		return len(correct), len(wrong), len(chicken)
