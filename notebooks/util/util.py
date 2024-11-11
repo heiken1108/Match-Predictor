@@ -441,6 +441,34 @@ class SimpleCostModel:
         tp, fp, tn, fn = get_metrics(data, threshold)
         return len(fp) * self.wrong + len(fn) * self.missed
 
+def perform_picks(data, confidence_threshold):
+    correct, wrong, skipped = [], [], []
+    for index, row in data.iterrows():
+        max_prob = max(row['Home Prob'], row['Draw Prob'], row['Away Prob'])
+        if max_prob < confidence_threshold:
+            skipped.append(row)
+            continue
+        GD = row['FTHG'] - row['FTAG']
+        if row['Home Prob'] == max_prob and GD > 0:
+            correct.append(row)
+        elif row['Draw Prob'] == max_prob and GD == 0:
+            correct.append(row)
+        elif row['Away Prob'] == max_prob and GD < 0:
+            correct.append(row)
+        else:
+            wrong.append(row)
+    return pd.Series(correct), pd.Series(wrong), pd.Series(skipped)
+        
+
+
+class PickCostModel:
+    def __init__(self, wrong, skipped):
+        self.wrong = wrong
+        self.skipped = skipped
+    
+    def cost(self, data, confidence_threshold):
+        correct, wrong, skipped = perform_picks(data, confidence_threshold)
+        return len(wrong) * self.wrong + len(skipped) * self.skipped
 
 def opt_thr(data, cmodel, thr_range):
     costs = [cmodel.cost(data, thr) for thr in thr_range]
@@ -783,7 +811,8 @@ def calculate_outcome_percentages(data):
 
 def get_cleaned_data(data: pd.DataFrame):
     data = data.dropna(subset=["HomeTeam", "AwayTeam", "FTHG", "FTAG"])
-    data.drop(columns="Referee", inplace=True)  # Fjerner kolonnen Referee
+    if 'Referee' in data.columns:
+        data.drop(columns="Referee", inplace=True)  # Fjerner kolonnen Referee
     data.dropna(inplace=True)  # Fjerner rader med manglende verdier
     data = data.reset_index(drop=True)
     return data
