@@ -4,6 +4,12 @@ import os
 import pandas as pd
 import seaborn as sns
 
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelBinarizer
+from sklearn.metrics import roc_curve, auc
+
+
 anomaly_color = 'sandybrown'
 prediction_color = 'yellowgreen'
 training_color = 'yellowgreen'
@@ -156,7 +162,7 @@ def load_data(data_folder, file_name) -> pd.DataFrame:
 
 def fetch_data_into_file(data_folder, file_name, start_year, end_year, leagues) -> None:
 	url_template = "https://www.football-data.co.uk/mmz4281/{season}/{league}.csv"
-	cols = ["Div", "Date", "HomeTeam", "AwayTeam", "FTHG", "FTAG", "FTR", "HTHG", "HTAG", "HTR", "Referee", "HS", "AS", "HST", "AST", "HF", "AF", "HC", "AC", "HY", "AY", "HR", "AR", "HBP"]
+	cols = ["Div", "Date", "HomeTeam", "AwayTeam", "FTHG", "FTAG", "FTR", "HTHG", "HTAG", "HTR", "Referee", "HS", "AS", "HST", "AST", "HF", "AF", "HC", "AC", "HY", "AY", "HR", "AR", "HBP", "PSH", "PSD", "PSA"]
 
 	#Generate seasons list
 	seasons = []
@@ -463,37 +469,133 @@ def add_sequential_column(data: pd.DataFrame, home_column, away_column, n=5, ope
 	return data
 
 
-def perform_picks(data, minimum_buffer_confidence): #Minimum confidence to next pick
-	correct = []
-	wrong = []
-	chicken = []
-	for index, row in data.iterrows():
-		home_prob = row['Home Prob']
-		draw_prob = row['Draw Prob']
-		away_prob = row['Away Prob']
+def perform_picks(data, confidence_threshold):
+    correct, wrong, skipped = [], [], []
+    for index, row in data.iterrows():
+        max_prob = max(row['Home Prob'], row['Draw Prob'], row['Away Prob'])
+        if max_prob < confidence_threshold:
+            skipped.append(row)
+            continue
+        GD = row['FTHG'] - row['FTAG']
+        if row['Home Prob'] == max_prob and GD > 0:
+            correct.append(row)
+        elif row['Draw Prob'] == max_prob and GD == 0:
+            correct.append(row)
+        elif row['Away Prob'] == max_prob and GD < 0:
+            correct.append(row)
+        else:
+            wrong.append(row)
+    return pd.Series(correct), pd.Series(wrong), pd.Series(skipped)
+        
 
-		max_prob = max(home_prob, draw_prob, away_prob)
-		next_best = max([prob for prob in [home_prob, draw_prob, away_prob] if prob != max_prob])
 
-		buffer = max_prob - next_best
-		if buffer < minimum_buffer_confidence:
-			chicken.append(row)
-		else:
-			if (max_prob == home_prob and row['H']) or (max_prob == draw_prob and row['D']) or (max_prob == away_prob and row['A']):
-				correct.append(row)
-			else:
-				wrong.append(row)
-	return pd.Series(correct), pd.Series(wrong), pd.Series(chicken)
+class PickCostModel:
+    def __init__(self, wrong, skipped):
+        self.wrong = wrong
+        self.skipped = skipped
+    
+    def cost(self, data, confidence_threshold):
+        correct, wrong, skipped = perform_picks(data, confidence_threshold)
+        return len(wrong) * self.wrong + len(skipped) * self.skipped
+	
 
-class CostModel():
-	def __init__(self, wrong, chicken):
-		self.wrong = wrong
-		self.chicken = chicken
 
-	def cost(self, data, minimum_buffer_confidence):
-		correct, wrong, chicken = perform_picks(data, minimum_buffer_confidence)
-		return len(wrong)*self.wrong + len(chicken)*self.chicken
 
-	def stats(self, data, minimum_buffer_confidence):
-		correct, wrong, chicken = perform_picks(data, minimum_buffer_confidence)
-		return len(correct), len(wrong), len(chicken)
+def prepare_binary_data(df):
+    # Create binary target variable (y): 1 for win, 0 for draw or loss
+    df['win'] = (df['FTHG'] > df['FTAG']).astype(int)
+    
+    # Select features (excluding unnecessary columns)
+    feature_columns = ['ELO diff',
+                      'Diff_goals_scored', 'Diff_goals_conceded', 'Matchrating',
+                      'Diff_points', 'Diff_change_in_ELO', 'Diff_opposition_mean_ELO',
+                      'Diff_shots_on_target_attempted', 'Diff_shots_on_target_allowed',
+                      'Diff_shots_attempted', 'Diff_shots_allowed', 'Diff_corners_awarded',
+                      'Diff_corners_conceded', 'Diff_fouls_commited', 'Diff_fouls_suffered',
+                      'Diff_yellow_cards', 'Diff_red_cards']
+    
+    X = df[feature_columns].copy()
+    y = df['win'].copy()
+    
+    return X, y
+
+def plot_binary_roc_curve(X, y):
+    # Split the data
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    
+    # Train a binary classifier (using Random Forest)
+    from sklearn.ensemble import RandomForestClassifier
+    clf = RandomForestClassifier(n_estimators=100, random_state=42)
+    clf.fit(X_train, y_train)
+    
+    # Get predictions
+    y_score = clf.predict_proba(X_test)[:, 1]  # Probability of positive class
+    
+    # Calculate ROC curve and ROC area
+    fpr, tpr, _ = roc_curve(y_test, y_score)
+    roc_auc = auc(fpr, tpr)
+    
+    # Plot ROC curve
+    plt.figure(figsize=(10, 8))
+    plt.plot(fpr, tpr, color='darkorange', lw=2,
+             label=f'ROC curve (AUC = {roc_auc:.2f})')
+    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('ROC Curve for Win Prediction')
+    plt.legend(loc="lower right")
+    
+    # Calculate and print additional metrics
+    from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+    y_pred = clf.predict(X_test)
+    print("\nModel Performance Metrics:")
+    print(f"Accuracy: {accuracy_score(y_test, y_pred):.3f}")
+    print(f"Precision: {precision_score(y_test, y_pred):.3f}")
+    print(f"Recall: {recall_score(y_test, y_pred):.3f}")
+    print(f"F1 Score: {f1_score(y_test, y_pred):.3f}")
+    print(f"ROC AUC: {roc_auc:.3f}")
+    
+    return roc_auc, clf
+
+def analyze_feature_importance(clf, feature_names):
+    # Get feature importance
+    importances = clf.feature_importances_
+    indices = np.argsort(importances)[::-1]
+    
+    # Print feature ranking
+    print("\nFeature Importance Ranking:")
+    for f in range(len(feature_names)):
+        print(f"{f + 1}. {feature_names[indices[f]]} ({importances[indices[f]]:.4f})")
+    
+    # Plot feature importance
+    plt.figure(figsize=(12, 6))
+    plt.title("Feature Importances")
+    plt.bar(range(len(feature_names)), importances[indices])
+    plt.xticks(range(len(feature_names)), [feature_names[i] for i in indices], rotation=45, ha='right')
+    plt.tight_layout()
+    
+    return importances, indices
+
+
+def plot_bars(data, figsize=None, tick_gap=1, series=None, title=None,
+              xlabel=None, ylabel=None, std=None):
+    plt.figure(figsize=figsize)
+    # x = np.arange(len(data))
+    # x = 0.5 + np.arange(len(data))
+    # plt.bar(x, data, width=0.7)
+    # x = data.index-0.5
+    x = data.index
+    plt.bar(x, data, width=0.7, yerr=std)
+    # plt.bar(x, data, width=0.7)
+    if series is not None:
+        # plt.plot(series.index-0.5, series, color='tab:orange')
+        plt.plot(series.index, series, color='tab:orange')
+    if tick_gap > 0:
+        plt.xticks(x[::tick_gap], data.index[::tick_gap], rotation=45)
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.grid(linestyle=':')
+    plt.tight_layout()
