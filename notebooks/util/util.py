@@ -458,7 +458,6 @@ def perform_picks(data, confidence_threshold):
         else:
             wrong.append(row)
     return pd.Series(correct), pd.Series(wrong), pd.Series(skipped)
-        
 
 
 class PickCostModel:
@@ -816,3 +815,83 @@ def get_cleaned_data(data: pd.DataFrame):
     data.dropna(inplace=True)  # Fjerner rader med manglende verdier
     data = data.reset_index(drop=True)
     return data
+
+
+def plot_auc_per_class(auc_per_class, class_names, auc_macro):
+    # Append the macro-average AUC for plotting
+    auc_values = auc_per_class.tolist() + [auc_macro]
+    class_names_with_macro = class_names + ["Macro-Average"]
+
+    # Create the bar plot
+    plt.figure(figsize=(8, 5))
+    plt.bar(class_names_with_macro, auc_values, color="skyblue")
+    plt.ylim(0, 1)  # AUC values range from 0 to 1
+    plt.xlabel("Class")
+    plt.ylabel("AUC")
+    plt.title("AUC for Each Class and Macro-Average AUC")
+
+    # Add value labels on top of each bar
+    for i, auc in enumerate(auc_values):
+        plt.text(i, auc + 0.02, f"{auc:.2f}", ha="center", va="bottom")
+
+    plt.show()
+
+from sklearn.metrics import roc_curve, auc
+from sklearn.preprocessing import label_binarize
+
+
+def plot_multi_class_roc(y_test, y_pred_proba, classes, class_names=None):
+    """
+    Plots ROC curves for multi-class classification.
+
+    Parameters:
+    - y_test: Array-like, true labels
+    - y_pred_proba: Array-like, probability predictions for each class
+    - classes: List of unique class labels (e.g., [-1, 0, 1])
+    - class_names: List of class names for display in the legend (default is None,
+                   which will use string representations of classes)
+    """
+    # Binarize the labels for multi-class ROC AUC calculation
+    y_test_binarized = label_binarize(y_test, classes=classes)
+    n_classes = y_test_binarized.shape[1]
+
+    # Initialize dictionaries to hold FPR, TPR, and AUC for each class
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+
+    # Calculate FPR, TPR, and AUC for each class
+    for i in range(n_classes):
+        fpr[i], tpr[i], _ = roc_curve(y_test_binarized[:, i], y_pred_proba[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
+
+    # Set default class names if none provided
+    if class_names is None:
+        class_names = [str(cls) for cls in classes]
+
+    # Plot all ROC curves
+    plt.figure(figsize=(8, 6))
+    colors = ["blue", "red", "green"]  # Customize or expand colors as needed
+
+    for i, color in enumerate(colors[:n_classes]):
+        plt.plot(
+            fpr[i],
+            tpr[i],
+            color=color,
+            lw=2,
+            label=f"ROC curve for {class_names[i]} (AUC = {roc_auc[i]:.2f})",
+        )
+
+    # Plot the diagonal line representing a random classifier
+    plt.plot([0, 1], [0, 1], "k--", lw=2)
+
+    # Customize the plot
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.title("ROC Curves for Multi-Class Classification")
+    plt.legend(loc="lower right")
+
+    # Show the plot
+    plt.show()
