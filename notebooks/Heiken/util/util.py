@@ -519,6 +519,25 @@ def prepare_binary_data(df):
     
     return X, y
 
+def prepare_data(df):
+    # Create target variable (y)
+    df['outcome'] = np.where(df['FTHG'] > df['FTAG'], 'win',
+                           np.where(df['FTHG'] == df['FTAG'], 'draw', 'loss'))
+    
+    # Select features (excluding unnecessary columns)
+    feature_columns = ['ELO diff', 'Home_prob_ELO', 'Draw_prob_ELO', 'Away_prob_ELO',
+                      'Diff_goals_scored', 'Diff_goals_conceded', 'Matchrating',
+                      'Diff_points', 'Diff_change_in_ELO', 'Diff_opposition_mean_ELO',
+                      'Diff_shots_on_target_attempted', 'Diff_shots_on_target_allowed',
+                      'Diff_shots_attempted', 'Diff_shots_allowed', 'Diff_corners_awarded',
+                      'Diff_corners_conceded', 'Diff_fouls_commited', 'Diff_fouls_suffered',
+                      'Diff_yellow_cards', 'Diff_red_cards']
+    
+    X = df[feature_columns]
+    y = df['outcome']
+    
+    return X, y
+
 def plot_binary_roc_curve(X, y):
     # Split the data
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -557,6 +576,50 @@ def plot_binary_roc_curve(X, y):
     print(f"F1 Score: {f1_score(y_test, y_pred):.3f}")
     print(f"ROC AUC: {roc_auc:.3f}")
     
+    return roc_auc, clf
+
+def plot_roc_curves(X, y):
+    # Split the data
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    
+    # Train a multi-class classifier (using Random Forest as an example)
+    from sklearn.ensemble import RandomForestClassifier
+    clf = RandomForestClassifier(n_estimators=100, random_state=42)
+    clf.fit(X_train, y_train)
+    
+    # Binarize the labels
+    lb = LabelBinarizer()
+    y_test_bin = lb.fit_transform(y_test)
+    
+    # Get predictions
+    y_score = clf.predict_proba(X_test)
+    
+    # Calculate ROC curve and ROC area for each class
+    n_classes = len(lb.classes_)
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+    
+    for i in range(n_classes):
+        fpr[i], tpr[i], _ = roc_curve(y_test_bin[:, i], y_score[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
+    
+    # Plot ROC curves
+    plt.figure(figsize=(10, 8))
+    colors = ['blue', 'red', 'green']
+    for i, color, cls in zip(range(n_classes), colors, lb.classes_):
+        plt.plot(fpr[i], tpr[i], color=color, lw=2,
+                label=f'ROC curve for {cls} (AUC = {roc_auc[i]:.2f})')
+    
+    plt.plot([0, 1], [0, 1], 'k--', lw=2)
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('ROC Curves for Match Outcome Classification')
+    plt.legend(loc="lower right")
+    
+    # Return the AUC scores and the classifier
     return roc_auc, clf
 
 def analyze_feature_importance(clf, feature_names):
