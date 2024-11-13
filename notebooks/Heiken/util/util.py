@@ -538,6 +538,15 @@ def prepare_data(df):
     
     return X, y
 
+def clean_data(data: pd.DataFrame) -> pd.DataFrame:
+    data = data.copy()
+    data = data.dropna(subset=["HomeTeam", "AwayTeam", "FTHG", "FTAG"])
+    if 'Referee' in data.columns:
+        data.drop(columns="Referee", inplace=True)  # Fjerner kolonnen Referee
+    data.dropna(inplace=True)  # Fjerner rader med manglende verdier
+    data = data.reset_index(drop=True)
+    return data
+
 def plot_binary_roc_curve(X, y):
     # Split the data
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
