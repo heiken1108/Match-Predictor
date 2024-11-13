@@ -8,6 +8,8 @@ import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.metrics import roc_curve, auc
+from sklearn.preprocessing import label_binarize
+
 
 
 anomaly_color = 'sandybrown'
@@ -157,8 +159,68 @@ def plot_series(data, labels=None,
 
 def load_data(data_folder, file_name) -> pd.DataFrame:
 	file_path = os.path.join(data_folder, file_name + '.csv')
-	df = pd.read_csv(file_path, parse_dates=['Date'], dtype={'Season': str})
+	df = pd.read_csv(file_path, dtype={'Season': str})
+    
+	if 'Date' in df.columns:
+		df = pd.read_csv(file_path, parse_dates=['Date'], dtype={'Season': str})
+    
 	return df
+
+def plot_multi_class_roc(y_test, y_pred_proba, classes, class_names=None):
+    """
+    Plots ROC curves for multi-class classification.
+
+    Parameters:
+    - y_test: Array-like, true labels
+    - y_pred_proba: Array-like, probability predictions for each class
+    - classes: List of unique class labels (e.g., [-1, 0, 1])
+    - class_names: List of class names for display in the legend (default is None,
+                   which will use string representations of classes)
+    """
+    # Binarize the labels for multi-class ROC AUC calculation
+    y_test_binarized = label_binarize(y_test, classes=classes)
+    n_classes = y_test_binarized.shape[1]
+
+    # Initialize dictionaries to hold FPR, TPR, and AUC for each class
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+
+    # Calculate FPR, TPR, and AUC for each class
+    for i in range(n_classes):
+        fpr[i], tpr[i], _ = roc_curve(y_test_binarized[:, i], y_pred_proba[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
+
+    # Set default class names if none provided
+    if class_names is None:
+        class_names = [str(cls) for cls in classes]
+
+    # Plot all ROC curves
+    plt.figure(figsize=(8, 6))
+    colors = ["blue", "red", "green"]  # Customize or expand colors as needed
+
+    for i, color in enumerate(colors[:n_classes]):
+        plt.plot(
+            fpr[i],
+            tpr[i],
+            color=color,
+            lw=2,
+            label=f"ROC curve for {class_names[i]} (AUC = {roc_auc[i]:.2f})",
+        )
+
+    # Plot the diagonal line representing a random classifier
+    plt.plot([0, 1], [0, 1], "k--", lw=2)
+
+    # Customize the plot
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.title("ROC Curves for Multi-Class Classification")
+    plt.legend(loc="lower right")
+
+    # Show the plot
+    plt.show()
 
 def fetch_data_into_file(data_folder, file_name, start_year, end_year, leagues) -> None:
 	url_template = "https://www.football-data.co.uk/mmz4281/{season}/{league}.csv"
