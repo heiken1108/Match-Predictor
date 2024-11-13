@@ -12,6 +12,7 @@ figsize = (9, 3)
 
 # Loading
 
+
 def fetch_data_into_file(data_folder, file_name, start_year, end_year, leagues) -> None:
     url_template = "https://www.football-data.co.uk/mmz4281/{season}/{league}.csv"
     cols = [
@@ -83,22 +84,26 @@ def fetch_data_into_file(data_folder, file_name, start_year, end_year, leagues) 
     file_path = os.path.join(data_folder, file_name + ".csv")
     df.to_csv(file_path, index=False)
     print("Data fetched and saved to", file_path)
-    
+
+
 def load_data(data_folder, file_name) -> pd.DataFrame:
     file_path = os.path.join(data_folder, file_name + ".csv")
     df = pd.read_csv(file_path, parse_dates=["Date"], dtype={"Season": str})
     return df
 
+
 def clean_data(data: pd.DataFrame) -> pd.DataFrame:
     data = data.copy()
     data = data.dropna(subset=["HomeTeam", "AwayTeam", "FTHG", "FTAG"])
-    if 'Referee' in data.columns:
+    if "Referee" in data.columns:
         data.drop(columns="Referee", inplace=True)  # Fjerner kolonnen Referee
     data.dropna(inplace=True)  # Fjerner rader med manglende verdier
     data = data.reset_index(drop=True)
     return data
 
+
 # Plotting
+
 
 def plot_histogram(
     y_values,
@@ -125,14 +130,16 @@ def plot_histogram(
     # Show the plot
     plt.tight_layout()  # Adjust layout to make room for labels
     plt.show()
-    
+
+
 def plot_sub_plots(data, cols, figsize=figsize):
     plt.close("all")
-    _, axes = plt.subplots(nrows=2, ncols=int(np.ceil(len(cols)//2)), figsize=figsize)
+    _, axes = plt.subplots(nrows=2, ncols=int(np.ceil(len(cols) // 2)), figsize=figsize)
     for ax, cname in zip(axes.ravel(), cols):
         data.hist(cname, ax=ax)
     plt.tight_layout()
-    
+
+
 def plot_series(
     data,
     labels=None,
@@ -191,24 +198,45 @@ def plot_series(
     plt.grid(":")
     plt.tight_layout()
 
-def plot_grouped_bars(data, figsize=figsize, title=None, xlabel='X', ylabel='Y'):
+
+def plot_grouped_bars(data, figsize=figsize, title=None, xlabel="X", ylabel="Y"):
     plt.close("all")
     data = data.copy()
     bar_positions = np.arange(len(data.index)) * 1.2
     home_wins = data["Number of Home Wins"]
     draws = data["Number of Draws"]
-    away_wins = data['Number of Away Wins']
+    away_wins = data["Number of Away Wins"]
 
     bar_width = 0.8  # Width less than 1 creates space between bars
-    plt.bar(bar_positions, home_wins, width=bar_width, 
-            label='Share home win', color='#4CAF50', 
-            edgecolor='black', linewidth=1)
-    plt.bar(bar_positions, draws, width=bar_width,
-            bottom=home_wins, label='Share draw', 
-            color='#FFA726', edgecolor='black', linewidth=1)
-    plt.bar(bar_positions, away_wins, width=bar_width,
-            bottom=home_wins+draws, label='Share away win', 
-            color='#EF5350', edgecolor='black', linewidth=1)
+    plt.bar(
+        bar_positions,
+        home_wins,
+        width=bar_width,
+        label="Share home win",
+        color="#4CAF50",
+        edgecolor="black",
+        linewidth=1,
+    )
+    plt.bar(
+        bar_positions,
+        draws,
+        width=bar_width,
+        bottom=home_wins,
+        label="Share draw",
+        color="#FFA726",
+        edgecolor="black",
+        linewidth=1,
+    )
+    plt.bar(
+        bar_positions,
+        away_wins,
+        width=bar_width,
+        bottom=home_wins + draws,
+        label="Share away win",
+        color="#EF5350",
+        edgecolor="black",
+        linewidth=1,
+    )
 
     # Customize the plot
     plt.xlabel(xlabel)
@@ -224,9 +252,10 @@ def plot_grouped_bars(data, figsize=figsize, title=None, xlabel='X', ylabel='Y')
     plt.tight_layout()
 
     plt.show()
-    
+
 
 # Modelling
+
 
 class ELO:  # Kan gjøre slik at home_advantage lages slik at den helles gir home_factor for kamper der hjemme og borte har samme rating
     def __init__(
@@ -329,6 +358,7 @@ class ELO:  # Kan gjøre slik at home_advantage lages slik at den helles gir hom
             data[column] = pd.to_numeric(data[column])
         return data
 
+
 def extract_elo_history(data, team) -> pd.DataFrame:
     elo_history = []
     for index, row in data.iterrows():
@@ -356,17 +386,23 @@ def extract_elo_history(data, team) -> pd.DataFrame:
 def pick_highest_probabilites(data: pd.DataFrame):
     wrong = 0
     correct = 1
-    for index,row in data.iterrows():
-        max_prob = max(row['Home Prob'], row['Draw Prob'], row['Away Prob'])
-        if (row['Home Prob'] == max_prob and row['FTR_H']) or (row['Draw Prob'] == max_prob and row['FTR_D']) or (row['Away Prob'] == max_prob and row['FTR_A']):
+    for index, row in data.iterrows():
+        max_prob = max(row["Home Prob"], row["Draw Prob"], row["Away Prob"])
+        if (
+            (row["Home Prob"] == max_prob and row["FTR_H"])
+            or (row["Draw Prob"] == max_prob and row["FTR_D"])
+            or (row["Away Prob"] == max_prob and row["FTR_A"])
+        ):
             correct += 1
         else:
             wrong += 1
     return correct, wrong
 
+
 def get_all_matches_of_team(data, team):
     c = data.copy()
     return c[(c["HomeTeam"] == team) | (c["AwayTeam"] == team)]
+
 
 def add_form_column(
     data: pd.DataFrame,
@@ -466,16 +502,16 @@ def add_form_column(
             elif operation == "Points":
                 for index_r, row_r in relevant_matches.iterrows():
                     if row_r["HomeTeam"] == team:
-                        if row_r["FTHG"] > row_r['FTAG']:
+                        if row_r["FTHG"] > row_r["FTAG"]:
                             s += 3
-                        elif row_r["FTHG"] == row_r['FTAG']:
+                        elif row_r["FTHG"] == row_r["FTAG"]:
                             s += 1
                         else:
                             s += 0
                     else:
-                        if row_r["FTAG"] > row_r['FTHG']:
+                        if row_r["FTAG"] > row_r["FTHG"]:
                             s += 3
-                        elif row_r["FTAG"] == row_r['FTHG']:
+                        elif row_r["FTAG"] == row_r["FTHG"]:
                             s += 1
                         else:
                             s += 0
@@ -487,9 +523,14 @@ def add_form_column(
                 data.at[key, new_column_name_home] = value
             else:
                 data.at[key, new_column_name_away] = value
-    data[new_column_name_home] = pd.to_numeric(data[new_column_name_home], errors='coerce')
-    data[new_column_name_away] = pd.to_numeric(data[new_column_name_away], errors='coerce')
+    data[new_column_name_home] = pd.to_numeric(
+        data[new_column_name_home], errors="coerce"
+    )
+    data[new_column_name_away] = pd.to_numeric(
+        data[new_column_name_away], errors="coerce"
+    )
     return data
+
 
 def remove_the_first_n_matches_in_a_season_for_each_team(data, n=5):
     # Create a copy of the DataFrame to avoid modifying the original
@@ -524,6 +565,7 @@ def remove_the_first_n_matches_in_a_season_for_each_team(data, n=5):
 
     return datacopy
 
+
 def calculate_outcome_percentages(data):
     data = data.copy()
 
@@ -536,11 +578,9 @@ def calculate_outcome_percentages(data):
 
     outcome_percentages = (
         data.groupby("Match Rating")["Outcome"]
-        .value_counts(
-            normalize=True
-        )  
-        .unstack(fill_value=0) 
-        * 100 
+        .value_counts(normalize=True)
+        .unstack(fill_value=0)
+        * 100
     )
 
     outcome_percentages = outcome_percentages.rename(
@@ -549,9 +589,7 @@ def calculate_outcome_percentages(data):
     outcome_percentages = outcome_percentages[["Home Wins %", "Draw %", "Away Wins %"]]
 
     outcome_counts = (
-        data.groupby("Match Rating")["Outcome"]
-        .value_counts()  
-        .unstack(fill_value=0) 
+        data.groupby("Match Rating")["Outcome"].value_counts().unstack(fill_value=0)
     )
 
     outcome_counts = outcome_counts.rename(
@@ -565,3 +603,83 @@ def calculate_outcome_percentages(data):
     outcome_stats = outcome_percentages.join(outcome_counts)
 
     return outcome_stats
+
+
+def plot_auc_per_class(auc_per_class, class_names, auc_macro):
+    # Append the macro-average AUC for plotting
+    auc_values = auc_per_class.tolist() + [auc_macro]
+    class_names_with_macro = class_names + ["Macro-Average"]
+
+    # Create the bar plot
+    plt.figure(figsize=(8, 5))
+    plt.bar(class_names_with_macro, auc_values, color="skyblue")
+    plt.ylim(0, 1)  # AUC values range from 0 to 1
+    plt.xlabel("Class")
+    plt.ylabel("AUC")
+    plt.title("AUC for Each Class and Macro-Average AUC")
+
+    # Add value labels on top of each bar
+    for i, auc in enumerate(auc_values):
+        plt.text(i, auc + 0.02, f"{auc:.2f}", ha="center", va="bottom")
+
+    plt.show()
+
+
+from sklearn.metrics import roc_curve, auc
+from sklearn.preprocessing import label_binarize
+
+def plot_multi_class_roc(y_test, y_pred_proba, classes, class_names=None):
+    """
+    Plots ROC curves for multi-class classification.
+
+    Parameters:
+    - y_test: Array-like, true labels
+    - y_pred_proba: Array-like, probability predictions for each class
+    - classes: List of unique class labels (e.g., [-1, 0, 1])
+    - class_names: List of class names for display in the legend (default is None,
+                   which will use string representations of classes)
+    """
+    # Binarize the labels for multi-class ROC AUC calculation
+    y_test_binarized = label_binarize(y_test, classes=classes)
+    n_classes = y_test_binarized.shape[1]
+
+    # Initialize dictionaries to hold FPR, TPR, and AUC for each class
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+
+    # Calculate FPR, TPR, and AUC for each class
+    for i in range(n_classes):
+        fpr[i], tpr[i], _ = roc_curve(y_test_binarized[:, i], y_pred_proba[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
+
+    # Set default class names if none provided
+    if class_names is None:
+        class_names = [str(cls) for cls in classes]
+
+    # Plot all ROC curves
+    plt.figure(figsize=(8, 6))
+    colors = ["blue", "red", "green"]  # Customize or expand colors as needed
+
+    for i, color in enumerate(colors[:n_classes]):
+        plt.plot(
+            fpr[i],
+            tpr[i],
+            color=color,
+            lw=2,
+            label=f"ROC curve for {class_names[i]} (AUC = {roc_auc[i]:.2f})",
+        )
+
+    # Plot the diagonal line representing a random classifier
+    plt.plot([0, 1], [0, 1], "k--", lw=2)
+
+    # Customize the plot
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.title("ROC Curves for Multi-Class Classification")
+    plt.legend(loc="lower right")
+
+    # Show the plot
+    plt.show()
