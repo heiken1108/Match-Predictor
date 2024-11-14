@@ -3,7 +3,6 @@ import os
 import numpy as np
 from sklearn.metrics import roc_curve, auc
 from sklearn.preprocessing import label_binarize
-from sklearn.inspection import permutation_importance
 import matplotlib.pyplot as plt
 
 anomaly_color = "sandybrown"
@@ -215,93 +214,6 @@ def plot_multiple_lines(data, x_col, line_cols=[], line_labels=[], x_label="Thre
 	plt.legend()
 	plt.grid(True)
 	plt.show()
-
-def calculate_coefficient_importance(model, feature_names, scaler=None):
-    coefficients = model.coef_
-    if scaler is not None:
-        scale = scaler.scale_
-        coefficients = coefficients * scale[np.newaxis, :]
-    
-    coef_importance_df = pd.DataFrame()
-    for class_idx in range(len(coefficients)):
-        class_coef = abs(coefficients[class_idx])
-        coef_importance_df[f'Class_{class_idx}'] = class_coef
-    coef_importance_df['Feature'] = feature_names
-    coef_importance_df['Mean_Coef_Importance'] = coef_importance_df.iloc[:, :-1].mean(axis=1)
-    
-    return coef_importance_df.sort_values('Mean_Coef_Importance', ascending=False)
-
-def calculate_permutation_importance(model, X, y, feature_names, n_repeats=10):
-    result = permutation_importance(
-        model, X, y,
-        n_repeats=n_repeats,
-        random_state=42,
-        scoring='neg_log_loss'
-    )
-    
-    perm_importance = pd.DataFrame({
-        'Feature': feature_names,
-        'Permutation_Importance': result.importances_mean,
-        'Permutation_Std': result.importances_std
-    })
-    
-    return perm_importance.sort_values('Permutation_Importance', ascending=False)
-
-def plot_bars(data, figsize=None, tick_gap=1, series=None, title=None,
-              xlabel=None, ylabel=None, std=None):
-    plt.figure(figsize=figsize)
-    # x = np.arange(len(data))
-    # x = 0.5 + np.arange(len(data))
-    # plt.bar(x, data, width=0.7)
-    # x = data.index-0.5
-    x = data.index
-    plt.bar(x, data, width=0.7, yerr=std)
-    # plt.bar(x, data, width=0.7)
-    if series is not None:
-        # plt.plot(series.index-0.5, series, color='tab:orange')
-        plt.plot(series.index, series, color='tab:orange')
-    if tick_gap > 0:
-        plt.xticks(x[::tick_gap], data.index[::tick_gap], rotation=45)
-    plt.title(title)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    plt.grid(linestyle=':')
-    plt.tight_layout()
-
-
-def plot_feature_importance(importance_df, importance_type='Permutation_Importance'):
-    """
-    Plot feature importance for a logistic regression model, including class-specific importance.
-    
-    Parameters:
-    importance_df : pandas.DataFrame
-        DataFrame containing feature importance metrics
-    importance_type : str, optional
-        Type of importance to plot, either 'Mean_Coef_Importance' or 'Permutation_Importance'
-    """
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
-    
-    importance_df = importance_df.sort_values(importance_type, ascending=True)
-    
-    importance_df.plot(kind='barh', x='Feature', y=importance_type, ax=ax1, legend=False)
-    if importance_type == 'Mean_Coef_Importance':
-        ax1.set_title('Mean Absolute Coefficient Importance')
-        ax1.set_xlabel('Mean |Coefficient|')
-    elif importance_type == 'Permutation_Importance':
-        ax1.set_title('Permutation Importance')
-        ax1.set_xlabel('Mean Accuracy Decrease')
-    ax1.set_ylabel('Features')
-    
-    class_cols = [col for col in importance_df.columns if col.startswith('Class_')]
-    if class_cols:
-        importance_df.plot(kind='barh', x='Feature', y=class_cols, ax=ax2)
-        ax2.set_title('Class-Specific Importance')
-        ax2.set_xlabel('|Coefficient|')
-    else:
-        ax2.set_visible(False)
-    
-    plt.tight_layout()
-    plt.show()
 
 
 def plot_grouped_bars(data, figsize=figsize, title=None, xlabel="X", ylabel="Y"):
