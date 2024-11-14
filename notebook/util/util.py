@@ -1,6 +1,9 @@
 import pandas as pd
 import os
 import numpy as np
+from sklearn.metrics import roc_curve, auc
+from sklearn.preprocessing import label_binarize
+from sklearn.inspection import permutation_importance
 import matplotlib.pyplot as plt
 
 anomaly_color = "sandybrown"
@@ -198,6 +201,108 @@ def plot_series(
     plt.grid(":")
     plt.tight_layout()
 
+def plot_multiple_lines(data, x_col, line_cols=[], line_labels=[], x_label="Threshold", y_label="Metric Value", title="Model Performance Metrics vs Threshold", figsize=figsize):
+	plt.close('all')
+	plt.figure(figsize=figsize)
+	colors = ['blue', 'orange', 'green', 'red', 'purple', 'black', 'gray', 'lightgreen', 'yellow', 'pink']
+	for index, line in enumerate(line_cols):
+		plt.plot(data[x_col], data[line], label=line_labels[index], color=colors[index])
+
+	# Add plot labels and legend
+	plt.xlabel(x_label)
+	plt.ylabel(y_label)
+	plt.title(title)
+	plt.legend()
+	plt.grid(True)
+	plt.show()
+
+def calculate_coefficient_importance(model, feature_names, scaler=None):
+    coefficients = model.coef_
+    if scaler is not None:
+        scale = scaler.scale_
+        coefficients = coefficients * scale[np.newaxis, :]
+    
+    coef_importance_df = pd.DataFrame()
+    for class_idx in range(len(coefficients)):
+        class_coef = abs(coefficients[class_idx])
+        coef_importance_df[f'Class_{class_idx}'] = class_coef
+    coef_importance_df['Feature'] = feature_names
+    coef_importance_df['Mean_Coef_Importance'] = coef_importance_df.iloc[:, :-1].mean(axis=1)
+    
+    return coef_importance_df.sort_values('Mean_Coef_Importance', ascending=False)
+
+def calculate_permutation_importance(model, X, y, feature_names, n_repeats=10):
+    result = permutation_importance(
+        model, X, y,
+        n_repeats=n_repeats,
+        random_state=42,
+        scoring='neg_log_loss'
+    )
+    
+    perm_importance = pd.DataFrame({
+        'Feature': feature_names,
+        'Permutation_Importance': result.importances_mean,
+        'Permutation_Std': result.importances_std
+    })
+    
+    return perm_importance.sort_values('Permutation_Importance', ascending=False)
+
+def plot_bars(data, figsize=None, tick_gap=1, series=None, title=None,
+              xlabel=None, ylabel=None, std=None):
+    plt.figure(figsize=figsize)
+    # x = np.arange(len(data))
+    # x = 0.5 + np.arange(len(data))
+    # plt.bar(x, data, width=0.7)
+    # x = data.index-0.5
+    x = data.index
+    plt.bar(x, data, width=0.7, yerr=std)
+    # plt.bar(x, data, width=0.7)
+    if series is not None:
+        # plt.plot(series.index-0.5, series, color='tab:orange')
+        plt.plot(series.index, series, color='tab:orange')
+    if tick_gap > 0:
+        plt.xticks(x[::tick_gap], data.index[::tick_gap], rotation=45)
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.grid(linestyle=':')
+    plt.tight_layout()
+
+
+def plot_feature_importance(importance_df, importance_type='Permutation_Importance'):
+    """
+    Plot feature importance for a logistic regression model, including class-specific importance.
+    
+    Parameters:
+    importance_df : pandas.DataFrame
+        DataFrame containing feature importance metrics
+    importance_type : str, optional
+        Type of importance to plot, either 'Mean_Coef_Importance' or 'Permutation_Importance'
+    """
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+    
+    importance_df = importance_df.sort_values(importance_type, ascending=True)
+    
+    importance_df.plot(kind='barh', x='Feature', y=importance_type, ax=ax1, legend=False)
+    if importance_type == 'Mean_Coef_Importance':
+        ax1.set_title('Mean Absolute Coefficient Importance')
+        ax1.set_xlabel('Mean |Coefficient|')
+    elif importance_type == 'Permutation_Importance':
+        ax1.set_title('Permutation Importance')
+        ax1.set_xlabel('Mean Accuracy Decrease')
+    ax1.set_ylabel('Features')
+    
+    class_cols = [col for col in importance_df.columns if col.startswith('Class_')]
+    if class_cols:
+        importance_df.plot(kind='barh', x='Feature', y=class_cols, ax=ax2)
+        ax2.set_title('Class-Specific Importance')
+        ax2.set_xlabel('|Coefficient|')
+    else:
+        ax2.set_visible(False)
+    
+    plt.tight_layout()
+    plt.show()
+
 
 def plot_grouped_bars(data, figsize=figsize, title=None, xlabel="X", ylabel="Y"):
     plt.close("all")
@@ -251,6 +356,84 @@ def plot_grouped_bars(data, figsize=figsize, title=None, xlabel="X", ylabel="Y")
     # Adjust layout to prevent label cutoff
     plt.tight_layout()
 
+    plt.show()
+
+def plot_auc_per_class(auc_per_class, class_names, auc_macro):
+    # Append the macro-average AUC for plotting
+    auc_values = auc_per_class.tolist() + [auc_macro]
+    class_names_with_macro = class_names + ["Macro-Average"]
+
+    # Create the bar plot
+    plt.figure(figsize=(8, 5))
+    plt.bar(class_names_with_macro, auc_values, color="skyblue")
+    plt.ylim(0, 1)  # AUC values range from 0 to 1
+    plt.xlabel("Class")
+    plt.ylabel("AUC")
+    plt.title("AUC for Each Class and Macro-Average AUC")
+
+    # Add value labels on top of each bar
+    for i, auc in enumerate(auc_values):
+        plt.text(i, auc + 0.02, f"{auc:.2f}", ha="center", va="bottom")
+
+    plt.show()
+
+
+
+
+def plot_multi_class_roc(y_test, y_pred_proba, classes, class_names=None):
+    """
+    Plots ROC curves for multi-class classification.
+
+    Parameters:
+    - y_test: Array-like, true labels
+    - y_pred_proba: Array-like, probability predictions for each class
+    - classes: List of unique class labels (e.g., [-1, 0, 1])
+    - class_names: List of class names for display in the legend (default is None,
+                   which will use string representations of classes)
+    """
+    # Binarize the labels for multi-class ROC AUC calculation
+    y_test_binarized = label_binarize(y_test, classes=classes)
+    n_classes = y_test_binarized.shape[1]
+
+    # Initialize dictionaries to hold FPR, TPR, and AUC for each class
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+
+    # Calculate FPR, TPR, and AUC for each class
+    for i in range(n_classes):
+        fpr[i], tpr[i], _ = roc_curve(y_test_binarized[:, i], y_pred_proba[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
+
+    # Set default class names if none provided
+    if class_names is None:
+        class_names = [str(cls) for cls in classes]
+
+    # Plot all ROC curves
+    plt.figure(figsize=(8, 6))
+    colors = ["blue", "red", "green"]  # Customize or expand colors as needed
+
+    for i, color in enumerate(colors[:n_classes]):
+        plt.plot(
+            fpr[i],
+            tpr[i],
+            color=color,
+            lw=2,
+            label=f"ROC curve for {class_names[i]} (AUC = {roc_auc[i]:.2f})",
+        )
+
+    # Plot the diagonal line representing a random classifier
+    plt.plot([0, 1], [0, 1], "k--", lw=2)
+
+    # Customize the plot
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.title("ROC Curves for Multi-Class Classification")
+    plt.legend(loc="lower right")
+
+    # Show the plot
     plt.show()
 
 
@@ -603,83 +786,3 @@ def calculate_outcome_percentages(data):
     outcome_stats = outcome_percentages.join(outcome_counts)
 
     return outcome_stats
-
-
-def plot_auc_per_class(auc_per_class, class_names, auc_macro):
-    # Append the macro-average AUC for plotting
-    auc_values = auc_per_class.tolist() + [auc_macro]
-    class_names_with_macro = class_names + ["Macro-Average"]
-
-    # Create the bar plot
-    plt.figure(figsize=(8, 5))
-    plt.bar(class_names_with_macro, auc_values, color="skyblue")
-    plt.ylim(0, 1)  # AUC values range from 0 to 1
-    plt.xlabel("Class")
-    plt.ylabel("AUC")
-    plt.title("AUC for Each Class and Macro-Average AUC")
-
-    # Add value labels on top of each bar
-    for i, auc in enumerate(auc_values):
-        plt.text(i, auc + 0.02, f"{auc:.2f}", ha="center", va="bottom")
-
-    plt.show()
-
-
-from sklearn.metrics import roc_curve, auc
-from sklearn.preprocessing import label_binarize
-
-def plot_multi_class_roc(y_test, y_pred_proba, classes, class_names=None):
-    """
-    Plots ROC curves for multi-class classification.
-
-    Parameters:
-    - y_test: Array-like, true labels
-    - y_pred_proba: Array-like, probability predictions for each class
-    - classes: List of unique class labels (e.g., [-1, 0, 1])
-    - class_names: List of class names for display in the legend (default is None,
-                   which will use string representations of classes)
-    """
-    # Binarize the labels for multi-class ROC AUC calculation
-    y_test_binarized = label_binarize(y_test, classes=classes)
-    n_classes = y_test_binarized.shape[1]
-
-    # Initialize dictionaries to hold FPR, TPR, and AUC for each class
-    fpr = dict()
-    tpr = dict()
-    roc_auc = dict()
-
-    # Calculate FPR, TPR, and AUC for each class
-    for i in range(n_classes):
-        fpr[i], tpr[i], _ = roc_curve(y_test_binarized[:, i], y_pred_proba[:, i])
-        roc_auc[i] = auc(fpr[i], tpr[i])
-
-    # Set default class names if none provided
-    if class_names is None:
-        class_names = [str(cls) for cls in classes]
-
-    # Plot all ROC curves
-    plt.figure(figsize=(8, 6))
-    colors = ["blue", "red", "green"]  # Customize or expand colors as needed
-
-    for i, color in enumerate(colors[:n_classes]):
-        plt.plot(
-            fpr[i],
-            tpr[i],
-            color=color,
-            lw=2,
-            label=f"ROC curve for {class_names[i]} (AUC = {roc_auc[i]:.2f})",
-        )
-
-    # Plot the diagonal line representing a random classifier
-    plt.plot([0, 1], [0, 1], "k--", lw=2)
-
-    # Customize the plot
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.xlabel("False Positive Rate")
-    plt.ylabel("True Positive Rate")
-    plt.title("ROC Curves for Multi-Class Classification")
-    plt.legend(loc="lower right")
-
-    # Show the plot
-    plt.show()
