@@ -290,6 +290,36 @@ def plot_auc_per_class(auc_per_class, class_names, auc_macro):
     plt.show()
 
 
+def find_optimal_threshold(y_true, y_proba, name):
+    fpr, tpr, thresholds = roc_curve(y_true, y_proba)
+    J = tpr - fpr  # Youden's J statistic
+    optimal_idx = np.argmax(J)
+    optimal_threshold = thresholds[optimal_idx]
+    optimal_tpr = tpr[optimal_idx]
+    optimal_fpr = fpr[optimal_idx]
+    print(f"optimal stats for {name}:")
+    print(f"Optimal Threshold: {optimal_threshold}")
+    print()
+    return thresholds[optimal_idx]
+
+
+def make_thresholded_predictions(y_pred_proba, thresholds):
+    predictions = []
+    for proba_away, proba_draw, proba_home in y_pred_proba:
+        # Map class labels to their corresponding probabilities
+        class_proba = {-1: proba_away, 0: proba_draw, 1: proba_home}
+
+        # Determine the class with the highest probability
+        predicted_class = max(class_proba, key=class_proba.get)
+        highest_proba = class_proba[predicted_class]
+
+        # Check if the highest probability exceeds the threshold for that class
+        if highest_proba > thresholds[predicted_class]:
+            predictions.append(predicted_class)  # Make prediction for the class
+        else:
+            predictions.append(None)  # Skip prediction if below threshold
+
+    return predictions
 
 
 def plot_multi_class_roc(y_test, y_pred_proba, classes, class_names=None):
