@@ -99,6 +99,28 @@ def plot_correlation_matrix(data: pd.DataFrame, figsize=(10, 8), cmap='Blues', a
     sns.heatmap(matrix, cmap=cmap, annot=annot, linewidth=0.5)  # Added linewidth parameter
     plt.tight_layout()
     plt.show()
+
+
+def plot_multiple_lines(data, x_col, line_cols=[], line_labels=[], x_label="Threshold", y_label="Metric Value", title="Model Performance Metrics vs Threshold", figsize=figsize):
+	plt.close('all')
+	plt.figure(figsize=figsize)
+	colors = ['blue', 'orange', 'green', 'red', 'purple', 'black', 'gray', 'lightgreen', 'yellow', 'pink']
+	for index, line in enumerate(line_cols):
+		plt.plot(data[x_col], data[line], label=line_labels[index], color=colors[index])
+	#plt.plot(results_df["threshold"], results_df["training_accuracy"], label="Training Accuracy", color="blue")
+	#plt.plot(results_df["threshold"], results_df["test_accuracy"], label="Test Accuracy", color="orange")
+	#plt.plot(results_df["threshold"], results_df["AUC_0"], label="AUC Class 0", color="green")
+	#plt.plot(results_df["threshold"], results_df["AUC_1"], label="AUC Class 1", color="red")
+	#plt.plot(results_df["threshold"], results_df["AUC_2"], label="AUC Class 2", color="purple")
+	#plt.plot(results_df["threshold"], results_df["fraction"], label="Fraction of Data", color="black")
+
+	# Add plot labels and legend
+	plt.xlabel("Threshold")
+	plt.ylabel("Metric Value")
+	plt.title("Model Performance Metrics vs Threshold")
+	plt.legend()
+	plt.grid(True)
+	plt.show()
 	
 
 
