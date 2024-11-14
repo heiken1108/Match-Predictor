@@ -8,6 +8,8 @@ import seaborn as sns
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.metrics import roc_curve, auc
+from sklearn.preprocessing import label_binarize
+
 
 
 anomaly_color = 'sandybrown'
@@ -97,6 +99,28 @@ def plot_correlation_matrix(data: pd.DataFrame, figsize=(10, 8), cmap='Blues', a
     sns.heatmap(matrix, cmap=cmap, annot=annot, linewidth=0.5)  # Added linewidth parameter
     plt.tight_layout()
     plt.show()
+
+
+def plot_multiple_lines(data, x_col, line_cols=[], line_labels=[], x_label="Threshold", y_label="Metric Value", title="Model Performance Metrics vs Threshold", figsize=figsize):
+	plt.close('all')
+	plt.figure(figsize=figsize)
+	colors = ['blue', 'orange', 'green', 'red', 'purple', 'black', 'gray', 'lightgreen', 'yellow', 'pink']
+	for index, line in enumerate(line_cols):
+		plt.plot(data[x_col], data[line], label=line_labels[index], color=colors[index])
+	#plt.plot(results_df["threshold"], results_df["training_accuracy"], label="Training Accuracy", color="blue")
+	#plt.plot(results_df["threshold"], results_df["test_accuracy"], label="Test Accuracy", color="orange")
+	#plt.plot(results_df["threshold"], results_df["AUC_0"], label="AUC Class 0", color="green")
+	#plt.plot(results_df["threshold"], results_df["AUC_1"], label="AUC Class 1", color="red")
+	#plt.plot(results_df["threshold"], results_df["AUC_2"], label="AUC Class 2", color="purple")
+	#plt.plot(results_df["threshold"], results_df["fraction"], label="Fraction of Data", color="black")
+
+	# Add plot labels and legend
+	plt.xlabel("Threshold")
+	plt.ylabel("Metric Value")
+	plt.title("Model Performance Metrics vs Threshold")
+	plt.legend()
+	plt.grid(True)
+	plt.show()
 	
 
 
@@ -157,8 +181,68 @@ def plot_series(data, labels=None,
 
 def load_data(data_folder, file_name) -> pd.DataFrame:
 	file_path = os.path.join(data_folder, file_name + '.csv')
-	df = pd.read_csv(file_path, parse_dates=['Date'], dtype={'Season': str})
+	df = pd.read_csv(file_path, dtype={'Season': str})
+    
+	if 'Date' in df.columns:
+		df = pd.read_csv(file_path, parse_dates=['Date'], dtype={'Season': str})
+    
 	return df
+
+def plot_multi_class_roc(y_test, y_pred_proba, classes, class_names=None):
+    """
+    Plots ROC curves for multi-class classification.
+
+    Parameters:
+    - y_test: Array-like, true labels
+    - y_pred_proba: Array-like, probability predictions for each class
+    - classes: List of unique class labels (e.g., [-1, 0, 1])
+    - class_names: List of class names for display in the legend (default is None,
+                   which will use string representations of classes)
+    """
+    # Binarize the labels for multi-class ROC AUC calculation
+    y_test_binarized = label_binarize(y_test, classes=classes)
+    n_classes = y_test_binarized.shape[1]
+
+    # Initialize dictionaries to hold FPR, TPR, and AUC for each class
+    fpr = dict()
+    tpr = dict()
+    roc_auc = dict()
+
+    # Calculate FPR, TPR, and AUC for each class
+    for i in range(n_classes):
+        fpr[i], tpr[i], _ = roc_curve(y_test_binarized[:, i], y_pred_proba[:, i])
+        roc_auc[i] = auc(fpr[i], tpr[i])
+
+    # Set default class names if none provided
+    if class_names is None:
+        class_names = [str(cls) for cls in classes]
+
+    # Plot all ROC curves
+    plt.figure(figsize=(8, 6))
+    colors = ["blue", "red", "green"]  # Customize or expand colors as needed
+
+    for i, color in enumerate(colors[:n_classes]):
+        plt.plot(
+            fpr[i],
+            tpr[i],
+            color=color,
+            lw=2,
+            label=f"ROC curve for {class_names[i]} (AUC = {roc_auc[i]:.2f})",
+        )
+
+    # Plot the diagonal line representing a random classifier
+    plt.plot([0, 1], [0, 1], "k--", lw=2)
+
+    # Customize the plot
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+    plt.title("ROC Curves for Multi-Class Classification")
+    plt.legend(loc="lower right")
+
+    # Show the plot
+    plt.show()
 
 def fetch_data_into_file(data_folder, file_name, start_year, end_year, leagues) -> None:
 	url_template = "https://www.football-data.co.uk/mmz4281/{season}/{league}.csv"
@@ -537,6 +621,15 @@ def prepare_data(df):
     y = df['outcome']
     
     return X, y
+
+def clean_data(data: pd.DataFrame) -> pd.DataFrame:
+    data = data.copy()
+    data = data.dropna(subset=["HomeTeam", "AwayTeam", "FTHG", "FTAG"])
+    if 'Referee' in data.columns:
+        data.drop(columns="Referee", inplace=True)  # Fjerner kolonnen Referee
+    data.dropna(inplace=True)  # Fjerner rader med manglende verdier
+    data = data.reset_index(drop=True)
+    return data
 
 def plot_binary_roc_curve(X, y):
     # Split the data
